@@ -2,9 +2,9 @@
   "name": "tryon-backend",
   "version": "1.0.0",
   "type": "module",
-  "main": "server.js",
+  "main": "sever.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node sever.js"
   },
   "engines": {
     "node": "18.x"
@@ -14,5 +14,6 @@
     "express": "^4.18.2"
   }
 }
+
 
 
