@@ -1,17 +1,20 @@
 import express from "express";
 import cors from "cors";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
-
-// CORS ko allow karna taake Shopify se requests aa sakein
 app.use(cors());
-
-// Body parser with limit (images ke liye 10mb kaafi hai)
 app.use(express.json({ limit: "10mb" }));
 
-const PORT = process.env.PORT || 3000;
+/* ===== HEALTH CHECK ===== */
+app.get("/", (req, res) => {
+  res.send("Try-On Backend is running ✅");
+});
 
-// POST Route for Try-On
+/* ===== MAIN TRYON API ===== */
 app.post("/tryon", async (req, res) => {
   try {
     const { userImage, productImage } = req.body;
@@ -20,25 +23,38 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing images" });
     }
 
-    // Yahan aap apni AI API call lagayenge baad mein
-    // Abhi ke liye ye demo response bhej raha hai
+    /* ===== FASHION.AI API CALL ===== */
+    const response = await fetch("https://api.fashion.ai/tryon", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.FASHION_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        user_image: userImage,
+        product_image: productImage
+      })
+    });
+
+    const data = await response.json();
+
+    if (!data || !data.result_image) {
+      throw new Error("Invalid AI response");
+    }
+
     res.json({
       success: true,
-      resultImage: productImage // Demo ke taur par product image wapas bhej raha hai
+      resultImage: data.result_image
     });
 
   } catch (err) {
-    console.error("Server Error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error(err);
+    res.status(500).json({ error: "AI processing failed" });
   }
 });
 
-// Health check route
-app.get("/", (req, res) => {
-  res.send("Try-On Backend is running on Railway ✅");
-});
-
-// Railway ke liye 0.0.0.0 par listen karna zaroori hai
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is live on port ${PORT}`);
+/* ===== START SERVER ===== */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
 });
