@@ -1,44 +1,69 @@
 import express from "express";
 import cors from "cors";
+import fetch from "node-fetch";
 
 const app = express();
 
-// CORS ko allow karna taake Shopify se requests aa sakein
-app.use(cors());
+app.use(cors({
+  origin: "*"
+}));
 
-// Body parser with limit (images ke liye 10mb kaafi hai)
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "15mb" }));
 
 const PORT = process.env.PORT || 3000;
+const FASHION_API_KEY = process.env.FASHION_API_KEY;
 
-// POST Route for Try-On
+/* ================= HEALTH CHECK ================= */
+app.get("/", (req, res) => {
+  res.send("✅ Try-On Backend is LIVE (Fashion.ai ready)");
+});
+
+/* ================= TRY-ON API ================= */
 app.post("/tryon", async (req, res) => {
   try {
     const { userImage, productImage } = req.body;
 
     if (!userImage || !productImage) {
-      return res.status(400).json({ error: "Missing images" });
+      return res.status(400).json({ error: "Images missing" });
     }
 
-    // Yahan aap apni AI API call lagayenge baad mein
-    // Abhi ke liye ye demo response bhej raha hai
+    if (!FASHION_API_KEY) {
+      return res.status(500).json({ error: "API key not configured" });
+    }
+
+    /* ===== CALL FASHION.AI ===== */
+    const response = await fetch("https://api.fashion.ai/tryon", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${FASHION_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model_image: userImage,     // user uploaded photo (base64 or URL)
+        garment_image: productImage // product image auto detected
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data?.result_image) {
+      console.error("Fashion AI Error:", data);
+      return res.status(500).json({ error: "AI processing failed" });
+    }
+
+    /* ===== SUCCESS ===== */
     res.json({
       success: true,
-      resultImage: productImage // Demo ke taur par product image wapas bhej raha hai
+      resultImage: data.result_image
     });
 
   } catch (err) {
-    console.error("Server Error:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("SERVER ERROR:", err);
+    res.status(500).json({ error: "Server crashed" });
   }
 });
 
-// Health check route
-app.get("/", (req, res) => {
-  res.send("Try-On Backend is running on Railway ✅");
-});
-
-// Railway ke liye 0.0.0.0 par listen karna zaroori hai
+/* ================= START SERVER ================= */
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is live on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
