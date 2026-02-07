@@ -5,7 +5,6 @@ import fetch from "node-fetch";
 const app = express();
 
 app.use(cors());
-// Image data base64 mein bari hoti hai, isliye limit 15mb sahi hai
 app.use(express.json({ limit: "15mb" }));
 
 const PORT = process.env.PORT || 3000;
@@ -17,10 +16,6 @@ if (!FASHION_API_KEY) {
   process.exit(1);
 }
 
-/**
- * POST /tryon
- * Frontend se base64 images yahan aayengi
- */
 app.post("/tryon", async (req, res) => {
   try {
     const { userImage, productImage } = req.body;
@@ -29,9 +24,9 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing images" });
     }
 
-    console.log("--- Sending Request to Fashn.ai ---");
+    console.log("--- Sending Request to Fashn.ai (v1.6) ---");
 
-    // 🔥 UPDATED CALL: Fixed for fashn.ai v1/run
+    // 🔥 FIXED: Updated model_name to tryon-v1.6 and added category
     const aiResponse = await fetch(FASHION_AI_ENDPOINT, {
       method: "POST",
       headers: {
@@ -39,12 +34,14 @@ app.post("/tryon", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model_name: "virtual-tryon", // 'model' ko 'model_name' kar diya (Error Fix)
+        model_name: "tryon-v1.6", // 'virtual-tryon' was invalid
         inputs: {
           person_image: userImage,
-          garment_image: productImage
+          garment_image: productImage,
+          garment_placeholder: "top", // Added for better AI detection
+          category: "tops" // Specified for the Gucci shirt
         },
-        output_format: "png" // base64 ke bajaye png format behtar hai
+        output_format: "png"
       })
     });
 
@@ -57,10 +54,8 @@ app.post("/tryon", async (req, res) => {
 
     console.log("✅ AI Success! Data received.");
 
-    /**
-     * Fashn.ai ka naya response aksar 'image' ya 'output_url' key mein hota hai
-     */
-    const resultUrl = aiData.image || aiData.output || aiData.result_image || aiData.output_url;
+    // Checking all possible output keys from fashn.ai
+    const resultUrl = aiData.image || aiData.output || aiData.result_image || (aiData.output && aiData.output[0]);
 
     if (!resultUrl) {
         console.error("❌ Unexpected Response Format:", aiData);
@@ -81,9 +76,8 @@ app.post("/tryon", async (req, res) => {
   }
 });
 
-// Health check
 app.get("/", (req, res) => {
-  res.send("✅ Fashn.ai Try-On Backend is LIVE & Updated");
+  res.send("✅ Fashn.ai Try-On Backend is LIVE & Optimized for v1.6");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
