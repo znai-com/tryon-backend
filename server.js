@@ -13,8 +13,8 @@ const FASHION_AI_ENDPOINT = process.env.FASHION_AI_ENDPOINT;
 app.post("/tryon", async (req, res) => {
   try {
     const { userImage, productImage, category } = req.body; 
-    console.log(`--- Request Start: [Category: ${category || 'tops'}] ---`);
-
+    
+    // Start AI Process
     const response = await fetch(FASHION_AI_ENDPOINT, {
       method: "POST",
       headers: {
@@ -26,42 +26,43 @@ app.post("/tryon", async (req, res) => {
         inputs: { 
           model_image: userImage, 
           garment_image: productImage, 
-          category: category || "tops" // Sirf zaroori parameters
+          category: category || "tops" 
         }
       })
     });
 
     const startData = await response.json();
-    
-    if (!startData.id) {
-        console.error("❌ API Response Error:", startData);
-        throw new Error(startData.message || "API could not start process");
-    }
+    if (!startData.id) throw new Error(startData.message || "API Error");
 
     const predictionId = startData.id;
     let resultUrl = null;
     let attempts = 0;
 
-    while (attempts < 20 && !resultUrl) {
+    // ⚡ FAST POLLING: Every 3 seconds check
+    while (attempts < 25 && !resultUrl) {
         await new Promise(r => setTimeout(r, 3000)); 
+        
         const checkRes = await fetch(`https://api.fashn.ai/v1/status/${predictionId}`, {
             headers: { "Authorization": `Bearer ${FASHION_API_KEY}` }
         });
-        const statusData = await checkRes.json();
         
+        const statusData = await checkRes.json();
+        console.log(`Checking Status... Attempt ${attempts + 1}: ${statusData.status}`);
+
         if (statusData.status === "completed") {
             resultUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
+            break; 
         } else if (statusData.status === "failed") {
-            throw new Error("AI Processing failed");
+            throw new Error("AI could not generate image");
         }
         attempts++;
     }
 
-    if (!resultUrl) throw new Error("Processing timed out");
+    if (!resultUrl) throw new Error("AI Timeout");
     return res.json({ success: true, resultImage: resultUrl });
 
   } catch (err) {
-    console.error("❌ SERVER ERROR:", err.message);
+    console.error("❌ ERROR:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });
