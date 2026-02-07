@@ -26,7 +26,6 @@ app.post("/tryon", async (req, res) => {
 
     console.log("--- Sending Request to Fashn.ai (v1.6) ---");
 
-    // 🔥 FINAL FIX: Based on your latest error logs
     const aiResponse = await fetch(FASHION_AI_ENDPOINT, {
       method: "POST",
       headers: {
@@ -36,14 +35,15 @@ app.post("/tryon", async (req, res) => {
       body: JSON.stringify({
         model_name: "tryon-v1.6", 
         inputs: {
-          model_image: userImage,     // Fixed: 'person_image' is now 'model_image'
+          model_image: userImage,     
           garment_image: productImage,
-          category: "tops"            // Required category
+          category: "tops"            
         },
         output_format: "png"
       })
     });
 
+    // --- Start of Replaced Section ---
     const aiData = await aiResponse.json();
 
     if (!aiResponse.ok) {
@@ -51,19 +51,34 @@ app.post("/tryon", async (req, res) => {
       throw new Error(JSON.stringify(aiData));
     }
 
-    console.log("✅ AI Success! Data received.");
+    console.log("✅ AI Success! Full Response:", JSON.stringify(aiData));
 
-    // Handling different response formats
-    const resultUrl = aiData.image || aiData.output || (aiData.output && aiData.output[0]);
+    // Fashn.ai v1.6 response handling (checks for array or direct strings)
+    let resultUrl = "";
+
+    if (aiData.output) {
+        // Agar array hai toh pehla element lo, warna direct string
+        resultUrl = Array.isArray(aiData.output) ? aiData.output[0] : aiData.output;
+    } else if (aiData.image) {
+        resultUrl = aiData.image;
+    } else if (aiData.result_image) {
+        resultUrl = aiData.result_image;
+    } else if (aiData.output_url) {
+        resultUrl = aiData.output_url;
+    }
 
     if (!resultUrl) {
-        throw new Error("Result image not found in AI response");
+        console.error("❌ Output keys missing in:", aiData);
+        throw new Error("Result image not found in AI response keys");
     }
+
+    console.log("🚀 Image Link Found:", resultUrl);
 
     return res.json({
       success: true,
       resultImage: resultUrl
     });
+    // --- End of Replaced Section ---
 
   } catch (err) {
     console.error("❌ BACKEND ERROR:", err.message);
@@ -75,7 +90,7 @@ app.post("/tryon", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("✅ Backend is Ready for v1.6");
+  res.send("✅ Backend is Ready for v1.6 with Enhanced Output Handling");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
