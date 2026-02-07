@@ -5,6 +5,7 @@ import fetch from "node-fetch";
 const app = express();
 
 app.use(cors());
+// Image data base64 mein bari hoti hai, isliye limit 15mb sahi hai
 app.use(express.json({ limit: "15mb" }));
 
 const PORT = process.env.PORT || 3000;
@@ -18,10 +19,7 @@ if (!FASHION_API_KEY) {
 
 /**
  * POST /tryon
- * body: {
- *   userImage: base64,
- *   productImage: base64
- * }
+ * Frontend se base64 images yahan aayengi
  */
 app.post("/tryon", async (req, res) => {
   try {
@@ -31,7 +29,9 @@ app.post("/tryon", async (req, res) => {
       return res.status(400).json({ error: "Missing images" });
     }
 
-    // 🔥 REAL FASHION.AI CALL
+    console.log("--- Sending Request to Fashn.ai ---");
+
+    // 🔥 UPDATED CALL: Fixed for fashn.ai v1/run
     const aiResponse = await fetch(FASHION_AI_ENDPOINT, {
       method: "POST",
       headers: {
@@ -39,47 +39,53 @@ app.post("/tryon", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "virtual-tryon",
+        model_name: "virtual-tryon", // 'model' ko 'model_name' kar diya (Error Fix)
         inputs: {
           person_image: userImage,
           garment_image: productImage
         },
-        output_format: "base64"
+        output_format: "png" // base64 ke bajaye png format behtar hai
       })
     });
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      throw new Error(errText);
-    }
-
     const aiData = await aiResponse.json();
 
-    /**
-     * Expected Fashion.ai response:
-     * {
-     *   result_image: "base64..."
-     * }
-     */
+    if (!aiResponse.ok) {
+      console.error("❌ FASHN.AI API Error:", aiData);
+      throw new Error(JSON.stringify(aiData));
+    }
 
-return res.json({
-  success: true,
-  resultImage: aiData.result_image || aiData.output || aiData.image
-});
+    console.log("✅ AI Success! Data received.");
+
+    /**
+     * Fashn.ai ka naya response aksar 'image' ya 'output_url' key mein hota hai
+     */
+    const resultUrl = aiData.image || aiData.output || aiData.result_image || aiData.output_url;
+
+    if (!resultUrl) {
+        console.error("❌ Unexpected Response Format:", aiData);
+        throw new Error("Result image not found in AI response");
+    }
+
+    return res.json({
+      success: true,
+      resultImage: resultUrl
+    });
+
   } catch (err) {
-    console.error("❌ AI ERROR:", err.message);
+    console.error("❌ BACKEND ERROR:", err.message);
     return res.status(500).json({
-      error: "AI processing failed"
+      error: "AI processing failed",
+      details: err.message
     });
   }
 });
 
 // Health check
 app.get("/", (req, res) => {
-  res.send("✅ Fashion.ai Try-On Backend is LIVE");
+  res.send("✅ Fashn.ai Try-On Backend is LIVE & Updated");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
