@@ -3,94 +3,72 @@ import cors from "cors";
 import fetch from "node-fetch";
 
 const app = express();
-
 app.use(cors());
-app.use(express.json({ limit: "15mb" }));
+app.use(express.json({ limit: "20mb" }));
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const FASHION_API_KEY = process.env.FASHION_API_KEY;
 const FASHION_AI_ENDPOINT = process.env.FASHION_AI_ENDPOINT;
-
-if (!FASHION_API_KEY) {
-  console.error("❌ FASHION_API_KEY missing");
-  process.exit(1);
-}
 
 app.post("/tryon", async (req, res) => {
   try {
     const { userImage, productImage } = req.body;
+    console.log("--- Initializing Try-On Request ---");
 
-    if (!userImage || !productImage) {
-      return res.status(400).json({ error: "Missing images" });
-    }
-
-    console.log("--- Sending Request to Fashn.ai (v1.6) ---");
-
-    const aiResponse = await fetch(FASHION_AI_ENDPOINT, {
+    // 1. Send Request to start processing
+    const response = await fetch(FASHION_AI_ENDPOINT, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${FASHION_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model_name: "tryon-v1.6", 
-        inputs: {
-          model_image: userImage,     
-          garment_image: productImage,
-          category: "tops"            
-        },
-        output_format: "png"
+        model_name: "tryon-v1.6",
+        inputs: { model_image: userImage, garment_image: productImage, category: "tops" }
       })
     });
 
-    // --- Start of Replaced Section ---
-    const aiData = await aiResponse.json();
-
-    if (!aiResponse.ok) {
-      console.error("❌ FASHN.AI API Error:", aiData);
-      throw new Error(JSON.stringify(aiData));
+    const startData = await response.json();
+    if (!startData.id) {
+        console.error("❌ Failed to get Prediction ID:", startData);
+        throw new Error("API did not return a process ID");
     }
 
-    console.log("✅ AI Success! Full Response:", JSON.stringify(aiData));
+    const predictionId = startData.id;
+    console.log(`✅ Request Queued. ID: ${predictionId}. Waiting for result...`);
 
-    // Fashn.ai v1.6 response handling (checks for array or direct strings)
-    let resultUrl = "";
+    // 2. Polling Logic: Wait for the image to be ready
+    let resultUrl = null;
+    let attempts = 0;
+    const maxAttempts = 15; // Wait for up to 30-45 seconds
 
-    if (aiData.output) {
-        // Agar array hai toh pehla element lo, warna direct string
-        resultUrl = Array.isArray(aiData.output) ? aiData.output[0] : aiData.output;
-    } else if (aiData.image) {
-        resultUrl = aiData.image;
-    } else if (aiData.result_image) {
-        resultUrl = aiData.result_image;
-    } else if (aiData.output_url) {
-        resultUrl = aiData.output_url;
+    while (attempts < maxAttempts && !resultUrl) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        
+        const checkRes = await fetch(`https://api.fashn.ai/v1/status/${predictionId}`, {
+            headers: { "Authorization": `Bearer ${FASHION_API_KEY}` }
+        });
+        
+        const statusData = await checkRes.json();
+        console.log(`Checking status... Attempt ${attempts + 1}: ${statusData.status}`);
+
+        if (statusData.status === "completed" || statusData.output) {
+            resultUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
+        } else if (statusData.status === "failed") {
+            throw new Error("AI Generation Failed on server");
+        }
+        attempts++;
     }
 
-    if (!resultUrl) {
-        console.error("❌ Output keys missing in:", aiData);
-        throw new Error("Result image not found in AI response keys");
-    }
+    if (!resultUrl) throw new Error("Processing timed out");
 
-    console.log("🚀 Image Link Found:", resultUrl);
-
-    return res.json({
-      success: true,
-      resultImage: resultUrl
-    });
-    // --- End of Replaced Section ---
+    console.log("🚀 Success! Image URL:", resultUrl);
+    return res.json({ success: true, resultImage: resultUrl });
 
   } catch (err) {
     console.error("❌ BACKEND ERROR:", err.message);
-    return res.status(500).json({
-      error: "AI processing failed",
-      details: err.message
-    });
+    return res.status(500).json({ error: "Try-on failed", details: err.message });
   }
-});
-
-app.get("/", (req, res) => {
-  res.send("✅ Backend is Ready for v1.6 with Enhanced Output Handling");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
