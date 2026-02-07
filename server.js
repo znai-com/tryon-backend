@@ -12,10 +12,11 @@ const FASHION_AI_ENDPOINT = process.env.FASHION_AI_ENDPOINT;
 
 app.post("/tryon", async (req, res) => {
   try {
-    const { userImage, productImage } = req.body;
-    console.log("--- Initializing Try-On Request ---");
+    // 1. Frontend se aane wali category pakarna
+    const { userImage, productImage, category } = req.body; 
+    console.log(`--- Initializing Try-On Request [Category: ${category || 'tops'}] ---`);
 
-    // 1. Send Request to start processing
+    // 2. Send Request to start processing
     const response = await fetch(FASHION_AI_ENDPOINT, {
       method: "POST",
       headers: {
@@ -23,8 +24,14 @@ app.post("/tryon", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model_name: "tryon-v1.6",
-        inputs: { model_image: userImage, garment_image: productImage, category: "tops" }
+        // Aap yahan 'tryon-max' bhi likh sakte hain agar v1.6 tracksuit sahi na banaye
+        model_name: "tryon-v1.6", 
+        inputs: { 
+          model_image: userImage, 
+          garment_image: productImage, 
+          category: category || "tops" // Dynamic category usage
+        },
+        output_format: "png"
       })
     });
 
@@ -37,13 +44,13 @@ app.post("/tryon", async (req, res) => {
     const predictionId = startData.id;
     console.log(`✅ Request Queued. ID: ${predictionId}. Waiting for result...`);
 
-    // 2. Polling Logic: Wait for the image to be ready
+    // 3. Polling Logic: Wait for the image to be ready
     let resultUrl = null;
     let attempts = 0;
-    const maxAttempts = 15; // Wait for up to 30-45 seconds
+    const maxAttempts = 20; // Thora extra time tracksuit jaise heavy images ke liye
 
     while (attempts < maxAttempts && !resultUrl) {
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        await new Promise(resolve => setTimeout(resolve, 3000)); 
         
         const checkRes = await fetch(`https://api.fashn.ai/v1/status/${predictionId}`, {
             headers: { "Authorization": `Bearer ${FASHION_API_KEY}` }
@@ -53,6 +60,7 @@ app.post("/tryon", async (req, res) => {
         console.log(`Checking status... Attempt ${attempts + 1}: ${statusData.status}`);
 
         if (statusData.status === "completed" || statusData.output) {
+            // Check for array or string output
             resultUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
         } else if (statusData.status === "failed") {
             throw new Error("AI Generation Failed on server");
@@ -69,6 +77,10 @@ app.post("/tryon", async (req, res) => {
     console.error("❌ BACKEND ERROR:", err.message);
     return res.status(500).json({ error: "Try-on failed", details: err.message });
   }
+});
+
+app.get("/", (req, res) => {
+  res.send("✅ Backend is LIVE - Dynamic Category & Slider Reset Enabled");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
