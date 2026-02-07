@@ -26,7 +26,7 @@ app.post("/tryon", async (req, res) => {
 
     console.log("--- Sending Request to Fashn.ai (v1.6) ---");
 
-    // 🔥 FIXED: Updated model_name to tryon-v1.6 and added category
+    // 🔥 FINAL FIX: Based on your latest error logs
     const aiResponse = await fetch(FASHION_AI_ENDPOINT, {
       method: "POST",
       headers: {
@@ -34,12 +34,11 @@ app.post("/tryon", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model_name: "tryon-v1.6", // 'virtual-tryon' was invalid
+        model_name: "tryon-v1.6", 
         inputs: {
-          person_image: userImage,
+          model_image: userImage,     // Fixed: 'person_image' is now 'model_image'
           garment_image: productImage,
-          garment_placeholder: "top", // Added for better AI detection
-          category: "tops" // Specified for the Gucci shirt
+          category: "tops"            // Required category
         },
         output_format: "png"
       })
@@ -54,11 +53,10 @@ app.post("/tryon", async (req, res) => {
 
     console.log("✅ AI Success! Data received.");
 
-    // Checking all possible output keys from fashn.ai
-    const resultUrl = aiData.image || aiData.output || aiData.result_image || (aiData.output && aiData.output[0]);
+    // Handling different response formats
+    const resultUrl = aiData.image || aiData.output || (aiData.output && aiData.output[0]);
 
     if (!resultUrl) {
-        console.error("❌ Unexpected Response Format:", aiData);
         throw new Error("Result image not found in AI response");
     }
 
@@ -77,7 +75,7 @@ app.post("/tryon", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("✅ Fashn.ai Try-On Backend is LIVE & Optimized for v1.6");
+  res.send("✅ Backend is Ready for v1.6");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
