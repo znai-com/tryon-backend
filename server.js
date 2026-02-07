@@ -62,11 +62,10 @@ app.post("/tryon", async (req, res) => {
      * }
      */
 
-    return res.json({
-      success: true,
-      resultImage: aiData.result_image
-    });
-
+return res.json({
+  success: true,
+  resultImage: aiData.result_image || aiData.output || aiData.image
+});
   } catch (err) {
     console.error("❌ AI ERROR:", err.message);
     return res.status(500).json({
@@ -83,3 +82,4 @@ app.get("/", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
