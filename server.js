@@ -1,28 +1,42 @@
+import express from "express";
+import cors from "cors";
+import fetch from "node-fetch";
+// Import store access logic
+import { isStoreAllowed } from "./allowedstore.js"; 
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+
+const FASHION_API_KEY = "YOUR_API_KEY_HERE";
+const FASHION_AI_ENDPOINT = "https://api.fashn.ai/v1/run";
+
+const jobs = {};
+
+// 1. Root route for health check
+app.get("/", (req, res) => res.send("Server is running!"));
+
+// 2. Try-On Start Route
 app.post("/tryon/start", async (req, res) => {
   try {
-
-    // 🔴 NEW STEP: STORE ACCESS CHECK (AI call se pehle)
-    const storeUrl =
-      req.headers.origin ||
-      req.headers.referer ||
-      req.body.storeUrl;
+    // 🔴 STORE ACCESS CHECK
+    const storeUrl = req.headers.origin || req.headers.referer || req.body.storeUrl;
 
     if (!isStoreAllowed(storeUrl)) {
-      return res.json({
+      return res.status(403).json({
         disabled: true,
-        message: "Virtual Try-On trial expired or store not authorized"
+        message: "Virtual Try-On trial expired or store not authorized. Please contact support."
       });
     }
-    // 🔴 END STORE CHECK
 
     const { userImage, productImage, category } = req.body;
-
     if (!userImage || !productImage) 
       return res.status(400).json({ error: "Missing images" });
 
     const jobId = Date.now().toString();
     jobs[jobId] = { status: "pending", resultUrl: null };
 
+    // Background Processing
     (async () => {
       try {
         const response = await fetch(FASHION_AI_ENDPOINT, {
@@ -42,28 +56,21 @@ app.post("/tryon/start", async (req, res) => {
         });
 
         const startData = await response.json();
-        
-        if (!startData.id) {
-          console.error("API Error Details:", startData);
-          throw new Error(startData.message || "API ID missing");
-        }
+        if (!startData.id) throw new Error(startData.message || "API ID missing");
 
         const predictionId = startData.id;
         let resultUrl = null;
         let attempts = 0;
 
-        while (attempts < 30 && !resultUrl) {
+        while (attempts < 40 && !resultUrl) {
           await new Promise(r => setTimeout(r, 3000));
-          const checkRes = await fetch(
-            `https://api.fashn.ai/v1/status/${predictionId}`,
-            { headers: { "Authorization": `Bearer ${FASHION_API_KEY}` } }
-          );
+          const checkRes = await fetch(`https://api.fashn.ai/v1/status/${predictionId}`, {
+            headers: { "Authorization": `Bearer ${FASHION_API_KEY}` }
+          });
           const statusData = await checkRes.json();
           
           if (statusData.status === "completed") {
-            resultUrl = Array.isArray(statusData.output)
-              ? statusData.output[0]
-              : statusData.output;
+            resultUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
             break;
           } else if (statusData.status === "failed") {
             throw new Error("AI Processing failed");
@@ -77,7 +84,6 @@ app.post("/tryon/start", async (req, res) => {
         } else {
           throw new Error("Timeout");
         }
-
       } catch (err) {
         console.error("❌ Job Error:", err.message);
         if (jobs[jobId]) jobs[jobId].status = "failed";
@@ -90,3 +96,13 @@ app.post("/tryon/start", async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
+// 3. Status Check Route
+app.get("/tryon/status/:jobId", (req, res) => {
+  const job = jobs[req.params.jobId];
+  if (!job) return res.status(404).json({ error: "Job not found" });
+  res.json(job);
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
