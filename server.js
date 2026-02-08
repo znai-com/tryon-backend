@@ -10,8 +10,15 @@ const PORT = process.env.PORT || 8080;
 const FASHION_API_KEY = process.env.FASHION_API_KEY;
 const FASHION_AI_ENDPOINT = process.env.FASHION_AI_ENDPOINT;
 
+// 🔹 In-memory job store
 const jobs = {}; 
 
+// 1. Health Check (Railway "Cannot Get /" fix karne ke liye)
+app.get("/", (req, res) => {
+  res.send("Server is running perfectly! 🚀");
+});
+
+// 2. Start Try-On Job
 app.post("/tryon/start", async (req, res) => {
   try {
     const { userImage, productImage, category } = req.body;
@@ -23,7 +30,7 @@ app.post("/tryon/start", async (req, res) => {
     const jobId = Date.now().toString();
     jobs[jobId] = { status: "pending", resultUrl: null };
 
-    // Async Job logic
+    // Async Job logic (AI processing)
     (async () => {
       try {
         const response = await fetch(FASHION_AI_ENDPOINT, {
@@ -38,7 +45,7 @@ app.post("/tryon/start", async (req, res) => {
               model_image: userImage,
               garment_image: productImage,
               category: category || "tops"
-              // pose_hint remove kar diya kyunki ye v1.6 mein error de raha hai
+              // Note: cover_feet aur adjust_hands nikaal diye hain BadRequest fix karne ke liye
             }
           })
         });
@@ -50,6 +57,7 @@ app.post("/tryon/start", async (req, res) => {
         let resultUrl = null;
         let attempts = 0;
 
+        // Fast Polling Logic
         while (attempts < 30 && !resultUrl) {
           await new Promise(r => setTimeout(r, 3000));
           const checkRes = await fetch(`https://api.fashn.ai/v1/status/${predictionId}`, {
@@ -82,14 +90,18 @@ app.post("/tryon/start", async (req, res) => {
     return res.json({ jobId });
 
   } catch (err) {
+    console.error("❌ Server Error:", err.message);
     return res.status(500).json({ error: err.message });
   }
 });
 
+// 3. Check Status Endpoint
 app.get("/tryon/status/:jobId", (req, res) => {
   const { jobId } = req.params;
   if (!jobs[jobId]) return res.status(404).json({ error: "Job not found" });
   return res.json(jobs[jobId]);
 });
 
-app.listen(PORT, "0.0.0.0");
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
