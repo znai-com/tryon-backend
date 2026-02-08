@@ -3,7 +3,28 @@ import cors from "cors";
 import fetch from "node-fetch";
 
 const app = express();
-app.use(cors());
+
+// --- DYNAMIC CORS START ---
+// Ye code Railway Dashboard ke "ALLOWED_STORES" variable se URLs uthayega
+const allowedOrigins = process.env.ALLOWED_STORES 
+  ? process.env.ALLOWED_STORES.split(',').map(url => url.trim()) 
+  : [];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // 1. Agar request Localhost se ho (development ke liye)
+    // 2. Agar request server-to-server ho (!origin)
+    // 3. Agar store ka URL allowedOrigins list mein ho
+    if (!origin || allowedOrigins.includes(origin) || origin.includes("localhost")) {
+      callback(null, true);
+    } else {
+      console.error(`Blocked by CORS: ${origin}`);
+      callback(new Error('CORS Policy: This store is not authorized!'));
+    }
+  }
+}));
+// --- DYNAMIC CORS END ---
+
 app.use(express.json({ limit: "25mb" })); 
 
 const PORT = process.env.PORT || 8080;
@@ -13,7 +34,7 @@ const FASHION_AI_ENDPOINT = process.env.FASHION_AI_ENDPOINT;
 const jobs = {}; 
 
 app.get("/", (req, res) => {
-  res.send("Server is running perfectly! 🚀");
+  res.send("Server is running perfectly! 🚀 Authorized Stores: " + allowedOrigins.join(", "));
 });
 
 app.post("/tryon/start", async (req, res) => {
@@ -40,14 +61,12 @@ app.post("/tryon/start", async (req, res) => {
               model_image: userImage,
               garment_image: productImage,
               category: category || "tops"
-              // 🔥 Invalid parameters (long_top, ns_less_vibrant) remove kar diye hain
             }
           })
         });
 
         const startData = await response.json();
         
-        // Agar API error de toh log mein dikhayega
         if (!startData.id) {
           console.error("API Error Details:", startData);
           throw new Error(startData.message || "API ID missing");
