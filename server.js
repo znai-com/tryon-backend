@@ -1,45 +1,20 @@
-import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
-import { isStoreAllowed } from "./storeAccess.js";
-
-const app = express();
-
-// --- DYNAMIC CORS START ---
-// Ye code Railway Dashboard ke "ALLOWED_STORES" variable se URLs uthayega
-const allowedOrigins = process.env.ALLOWED_STORES 
-  ? process.env.ALLOWED_STORES.split(',').map(url => url.trim()) 
-  : [];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // 1. Agar request Localhost se ho (development ke liye)
-    // 2. Agar request server-to-server ho (!origin)
-    // 3. Agar store ka URL allowedOrigins list mein ho
-    if (!origin || allowedOrigins.includes(origin) || origin.includes("localhost")) {
-      callback(null, true);
-    } else {
-      console.error(`Blocked by CORS: ${origin}`);
-      callback(new Error('CORS Policy: This store is not authorized!'));
-    }
-  }
-}));
-// --- DYNAMIC CORS END ---
-
-app.use(express.json({ limit: "25mb" })); 
-
-const PORT = process.env.PORT || 8080;
-const FASHION_API_KEY = process.env.FASHION_API_KEY;
-const FASHION_AI_ENDPOINT = process.env.FASHION_AI_ENDPOINT;
-
-const jobs = {}; 
-
-app.get("/", (req, res) => {
-  res.send("Server is running perfectly! 🚀 Authorized Stores: " + allowedOrigins.join(", "));
-});
-
 app.post("/tryon/start", async (req, res) => {
   try {
+
+    // 🔴 NEW STEP: STORE ACCESS CHECK (AI call se pehle)
+    const storeUrl =
+      req.headers.origin ||
+      req.headers.referer ||
+      req.body.storeUrl;
+
+    if (!isStoreAllowed(storeUrl)) {
+      return res.json({
+        disabled: true,
+        message: "Virtual Try-On trial expired or store not authorized"
+      });
+    }
+    // 🔴 END STORE CHECK
+
     const { userImage, productImage, category } = req.body;
 
     if (!userImage || !productImage) 
@@ -79,13 +54,16 @@ app.post("/tryon/start", async (req, res) => {
 
         while (attempts < 30 && !resultUrl) {
           await new Promise(r => setTimeout(r, 3000));
-          const checkRes = await fetch(`https://api.fashn.ai/v1/status/${predictionId}`, {
-            headers: { "Authorization": `Bearer ${FASHION_API_KEY}` }
-          });
+          const checkRes = await fetch(
+            `https://api.fashn.ai/v1/status/${predictionId}`,
+            { headers: { "Authorization": `Bearer ${FASHION_API_KEY}` } }
+          );
           const statusData = await checkRes.json();
           
           if (statusData.status === "completed") {
-            resultUrl = Array.isArray(statusData.output) ? statusData.output[0] : statusData.output;
+            resultUrl = Array.isArray(statusData.output)
+              ? statusData.output[0]
+              : statusData.output;
             break;
           } else if (statusData.status === "failed") {
             throw new Error("AI Processing failed");
@@ -112,14 +90,3 @@ app.post("/tryon/start", async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
-
-app.get("/tryon/status/:jobId", (req, res) => {
-  const { jobId } = req.params;
-  if (!jobs[jobId]) return res.status(404).json({ error: "Job not found" });
-  return res.json(jobs[jobId]);
-});
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
