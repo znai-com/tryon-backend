@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
+import { isStoreAllowed } from "./storeAccess.js";
 
 const app = express();
 
@@ -121,3 +122,4 @@ app.get("/tryon/status/:jobId", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
+
