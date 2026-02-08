@@ -1,12 +1,12 @@
 export const STORE_ACCESS = [
   {
     url: "34ssyd-13.myshopify.com", 
-    expiresAt: "2026-02-07", 
+    expiresAt: "2026-02-10", 
     status: "trial"
   },
   {
     url: "admin.shopify.com", // Preview mode ke liye
-    expiresAt: "2026-02-07",
+    expiresAt: "2026-02-10",
     status: "trial"
   }
 ];
@@ -27,4 +27,5 @@ export function isStoreAllowed(storeUrl) {
   if (store.status === "paid") return true;
   return store.expiresAt && today <= store.expiresAt;
 }
+
 
