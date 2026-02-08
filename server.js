@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-const FASHION_API_KEY = "YOUR_API_KEY_HERE";
+const FASHION_API_KEY = "fa-XIsqkqnGEC0v-4JqJ8R47BVQPcO4SUAJ89yM0";
 const FASHION_AI_ENDPOINT = "https://api.fashn.ai/v1/run";
 
 const jobs = {};
@@ -108,3 +108,4 @@ const server = app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`)
 // 🔴 Connection timeout settings for large files
 server.keepAliveTimeout = 300000;
 server.headersTimeout = 305000;
+
