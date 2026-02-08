@@ -39,18 +39,19 @@ app.post("/tryon/start", async (req, res) => {
             inputs: {
               model_image: userImage,
               garment_image: productImage,
-              category: category || "tops",
-              // 🔥 NEW PERFORMANCE PARAMS FOR BETTER RESULTS
-              long_top: false, // Shirt ko ghutno tak jane se rokta hai
-              ns_less_vibrant: false, // Colors ko real rakhta hai
-              garment_photo_type: "auto", 
-              num_samples: 1 // Quality maintain rakhta hai
+              category: category || "tops"
+              // 🔥 Invalid parameters (long_top, ns_less_vibrant) remove kar diye hain
             }
           })
         });
 
         const startData = await response.json();
-        if (!startData.id) throw new Error(startData.message || "API ID missing");
+        
+        // Agar API error de toh log mein dikhayega
+        if (!startData.id) {
+          console.error("API Error Details:", startData);
+          throw new Error(startData.message || "API ID missing");
+        }
 
         const predictionId = startData.id;
         let resultUrl = null;
@@ -81,7 +82,7 @@ app.post("/tryon/start", async (req, res) => {
 
       } catch (err) {
         console.error("❌ Job Error:", err.message);
-        jobs[jobId].status = "failed";
+        if (jobs[jobId]) jobs[jobId].status = "failed";
       }
     })();
 
@@ -98,4 +99,6 @@ app.get("/tryon/status/:jobId", (req, res) => {
   return res.json(jobs[jobId]);
 });
 
-app.listen(PORT, "0.0.0.0");
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
