@@ -2,7 +2,7 @@
 
 export const STORE_ACCESS = [
   {
-    url: "example-store.com",
+    url: "https://34ssyd-13.myshopify.com/",
     expiresAt: "2026-02-15", // trial
     status: "trial"
   },
@@ -40,3 +40,4 @@ export function isStoreAllowed(storeUrl) {
 
   return false;
 }
+
