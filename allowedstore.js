@@ -5,7 +5,7 @@ export const STORE_ACCESS = [
     status: "trial"
   },
   {
-    url: "admin.shopify.com", // 🔴 Is se preview mode chal jayega
+    url: "admin.shopify.com", // Preview mode ke liye
     expiresAt: "2026-12-31",
     status: "trial"
   }
@@ -16,30 +16,14 @@ function normalizeUrl(url) {
   return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "").split('/')[0].toLowerCase();
 }
 
+// 🔴 Isay sirf EK baar rehne den
 export function isStoreAllowed(storeUrl) {
   if (!storeUrl) return false;
   const today = new Date().toISOString().split("T")[0];
   const normalized = normalizeUrl(storeUrl);
   const store = STORE_ACCESS.find(s => normalizeUrl(s.url) === normalized);
+  
   if (!store) return false;
   if (store.status === "paid") return true;
   return store.expiresAt && today <= store.expiresAt;
 }
-
-export function isStoreAllowed(storeUrl) {
-  if (!storeUrl) return false;
-
-  const today = new Date().toISOString().split("T")[0];
-  const normalized = normalizeUrl(storeUrl);
-
-  const store = STORE_ACCESS.find(
-    s => normalizeUrl(s.url) === normalized
-  );
-
-  if (!store) return false;
-  if (store.status === "paid") return true;
-  if (store.expiresAt && today <= store.expiresAt) return true;
-
-  return false;
-}
-
