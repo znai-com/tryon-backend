@@ -1,14 +1,14 @@
-// storeAccess.js
+// storeAccess.js logic
 
 export const STORE_ACCESS = [
   {
-    url: "https://34ssyd-13.myshopify.com/",
-    expiresAt: "2026-02-15", // trial
+    url: "34ssyd-13.myshopify.com", // 👈 Bilkul saaf domain
+    expiresAt: "2026-02-15", 
     status: "trial"
   },
   {
     url: "paid-store.com",
-    expiresAt: null, // lifetime
+    expiresAt: null, 
     status: "paid"
   }
 ];
@@ -19,6 +19,7 @@ function normalizeUrl(url) {
     .replace(/^https?:\/\//, "")
     .replace(/^www\./, "")
     .replace(/\/$/, "")
+    .split('/')[0] // Path nikalne ke liye
     .toLowerCase();
 }
 
@@ -33,11 +34,8 @@ export function isStoreAllowed(storeUrl) {
   );
 
   if (!store) return false;
-
   if (store.status === "paid") return true;
-
   if (store.expiresAt && today <= store.expiresAt) return true;
 
   return false;
 }
-
