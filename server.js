@@ -1,31 +1,31 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-// Import store access logic
 import { isStoreAllowed } from "./allowedstore.js"; 
 
 const app = express();
 app.use(cors());
+
+// 🔴 Fix for 'Request Aborted': Increase payload limits
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const FASHION_API_KEY = "YOUR_API_KEY_HERE";
 const FASHION_AI_ENDPOINT = "https://api.fashn.ai/v1/run";
 
 const jobs = {};
 
-// 1. Root route for health check
 app.get("/", (req, res) => res.send("Server is running!"));
 
-// 2. Try-On Start Route
 app.post("/tryon/start", async (req, res) => {
   try {
-    // 🔴 STORE ACCESS CHECK
+    // 🔴 Store Access Check
     const storeUrl = req.headers.origin || req.headers.referer || req.body.storeUrl;
 
     if (!isStoreAllowed(storeUrl)) {
       return res.status(403).json({
         disabled: true,
-        message: "Virtual Try-On trial expired or store not authorized. Please contact support."
+        message: "Virtual Try-On trial expired or store not authorized. Contact support."
       });
     }
 
@@ -36,7 +36,6 @@ app.post("/tryon/start", async (req, res) => {
     const jobId = Date.now().toString();
     jobs[jobId] = { status: "pending", resultUrl: null };
 
-    // Background Processing
     (async () => {
       try {
         const response = await fetch(FASHION_AI_ENDPOINT, {
@@ -97,7 +96,6 @@ app.post("/tryon/start", async (req, res) => {
   }
 });
 
-// 3. Status Check Route
 app.get("/tryon/status/:jobId", (req, res) => {
   const job = jobs[req.params.jobId];
   if (!job) return res.status(404).json({ error: "Job not found" });
@@ -105,4 +103,8 @@ app.get("/tryon/status/:jobId", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
+
+// 🔴 Connection timeout settings for large files
+server.keepAliveTimeout = 300000;
+server.headersTimeout = 305000;
