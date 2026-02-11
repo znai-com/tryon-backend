@@ -62,7 +62,7 @@ app.post("/tryon/start", async (req, res) => {
         let attempts = 0;
 
         while (attempts < 40 && !resultUrl) {
-          await new Promise(r => setTimeout(r, 3000));
+          await new Promise(r => setTimeout(r, 6000));
           const checkRes = await fetch(`https://api.fashn.ai/v1/status/${predictionId}`, {
             headers: { "Authorization": `Bearer ${FASHION_API_KEY}` }
           });
@@ -106,6 +106,7 @@ const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
 
 // 🔴 Connection timeout settings for large files
-server.keepAliveTimeout = 300000;
-server.headersTimeout = 305000;
+server.keepAliveTimeout = 500000;
+server.headersTimeout = 505000;
+
 
